@@ -1,105 +1,86 @@
-import time
-import requests
-from urllib.parse import quote_plus
-
-# Глобальный последний запрос (для rate limiting)
-_last_request_time = 0
-
 def osm_geocoder(arguments):
-    global _last_request_time
+    import time
+    import requests
+    from urllib.parse import quote_plus
 
+    global _last_request_time
+    if '_last_request_time' not in globals():
+        globals()['_last_request_time'] = 0
+
+    # Обязательные и опциональные параметры
+    email = arguments.get('email')
     address = arguments.get('address')
     lat = arguments.get('lat')
     lon = arguments.get('lon')
-    email = arguments.get('email', '').strip()
-    language = arguments.get('language', 'ru')
-    limit = arguments.get('limit', 1)
-    detailed = arguments.get('detailed', False)  # возвращать полные данные?
+    language = arguments.get('language', 'ru')  # по умолчанию 'ru'
 
-    if not email or '@' not in email:
-        return {"error": "Укажите корректный email в параметре 'email' (требуется Nominatim)"}
+    # Проверка обязательного параметра
+    if not email or '@' not in str(email):
+        return {"error": "Параметр 'email' обязателен и должен содержать '@'"}
 
-    has_address = bool(address and address.strip())
+    has_address = address is not None and address != ""
     has_coords = lat is not None and lon is not None
 
-    if has_address == has_coords:
-        return {"error": "Укажите ТОЛЬКО 'address' ИЛИ ТОЛЬКО 'lat' и 'lon'"}
+    if has_address and has_coords:
+        return {"error": "Укажите либо 'address', либо 'lat' и 'lon', но не вместе."}
+    if not has_address and not has_coords:
+        return {"error": "Укажите либо 'address', либо оба параметра 'lat' и 'lon'."}
 
-    # Собираем строку для кэширования
-    cache_key = f"{'addr:' + address if has_address else f'coord:{lat},{lon}'}|{language}|{limit}"
-
-    # Ждём, если прошло <1 сек с последнего запроса
+    # Rate limiting: 1 запрос в секунду
     now = time.time()
-    if now - _last_request_time < 1.1:
-        time.sleep(1.1 - (now - _last_request_time))
-    _last_request_time = time.time()
+    if now - globals()['_last_request_time'] < 1.1:
+        time.sleep(1.1 - (now - globals()['_last_request_time']))
+    globals()['_last_request_time'] = now
 
     try:
+        headers = {"User-Agent": f"GeocoderApp/1.0 ({email})"}
+
         if has_address:
             url = (
                 f"https://nominatim.openstreetmap.org/search?"
-                f"format=json&q={quote_plus(address)}&accept-language={language}&limit={limit}&addressdetails=1"
+                f"format=json&q={quote_plus(address)}&accept-language={language}&limit=1&addressdetails=1"
             )
         else:
+            # Убран лишний пробел в URL
             url = (
                 f"https://nominatim.openstreetmap.org/reverse?"
                 f"format=json&lat={lat}&lon={lon}&accept-language={language}&addressdetails=1"
             )
 
-        headers = {"User-Agent": f"GeocoderApp/1.0 ({email})"}
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
 
+        def format_address(addr_dict):
+            parts = []
+            for key in ['country', 'state', 'city', 'town', 'village', 'road']:
+                if addr_dict.get(key):
+                    parts.append(addr_dict[key])
+            if addr_dict.get('house_number') and parts:
+                parts[-1] += f" {addr_dict['house_number']}"
+            return ", ".join(parts) if parts else "Адрес недоступен"
+
         if has_address:
             if not data:
                 return {"error": "Адрес не найден"}
-            results = []
-            for item in data:
-                addr = item.get('address', {})
-                compact = f"{addr.get('road', '')} {addr.get('house_number', '')}".strip()
-                if not compact:
-                    compact = addr.get('city', '') or addr.get('town', '') or addr.get('country', '')
-                full = ", ".join(filter(None, [
-                    addr.get('country'),
-                    addr.get('state'),
-                    addr.get('city') or addr.get('town') or addr.get('village'),
-                    addr.get('road'),
-                    addr.get('house_number')
-                ]))
-                result = {
-                    "address": full,
-                    "latitude": float(item['lat']),
-                    "longitude": float(item['lon']),
-                    "postcode": addr.get('postcode'),
-                    "country_code": addr.get('country_code')
-                }
-                if detailed:
-                    result["raw"] = item
-                results.append(result)
-            return results[0] if limit == 1 else results
-
+            item = data[0]
+            return {
+                "address": format_address(item.get("address", {})),
+                "latitude": float(item["lat"]),
+                "longitude": float(item["lon"]),
+                "postcode": item.get("address", {}).get("postcode"),
+                "country_code": item.get("address", {}).get("country_code")
+            }
         else:
             if "error" in data:
                 return {"error": "Объект не найден"}
-            addr = data.get('address', {})
-            full = ", ".join(filter(None, [
-                addr.get('country'),
-                addr.get('state'),
-                addr.get('city') or addr.get('town') or addr.get('village'),
-                addr.get('road'),
-                addr.get('house_number')
-            ]))
-            result = {
-                "address": full,
+            return {
+                "address": format_address(data.get("address", {})),
                 "latitude": float(lat),
                 "longitude": float(lon),
-                "postcode": addr.get('postcode'),
-                "country_code": addr.get('country_code')
+                "postcode": data.get("address", {}).get("postcode"),
+                "country_code": data.get("address", {}).get("country_code")
             }
-            if detailed:
-                result["raw"] = data
-            return result
 
     except Exception as e:
-        return {"error": f"Ошибка: {str(e)}"}
+        return {"error": f"Ошибка запроса: {str(e)}"}

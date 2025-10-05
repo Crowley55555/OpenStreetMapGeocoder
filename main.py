@@ -16,7 +16,7 @@ print("-" * 50)
 # Обратное геокодирование: координаты → адрес
 result_reverse = osm_geocoder({
     "lat": 59.9366228,
-    "lon": 30.3133837,
+    "lon": 40.3133837,
     "email": "your.email@example.com",  # ← тот же email!
     "language": "ru"
 })
