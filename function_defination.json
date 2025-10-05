@@ -1,0 +1,26 @@
+{
+  "name": "osm_geocoder",
+  "description": "Прямое и обратное геокодирование через OpenStreetMap Nominatim API",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "string",
+        "description": "Адрес для прямого геокодирования (например, 'Москва, Тверская 1')"
+      },
+      "lat": {
+        "type": "number",
+        "description": "Широта (latitude) для обратного геокодирования"
+      },
+      "lon": {
+        "type": "number",
+        "description": "Долгота (longitude) для обратного геокодирования"
+      },
+      "email": {
+        "type": "string",
+        "description": "Ваш email (рекомендуется для соблюдения правил Nominatim)"
+      }
+    },
+    "required": []
+  }
+}
