@@ -2,7 +2,7 @@ from osm_geocoder import osm_geocoder
 # Прямое геокодирование: адрес → координаты + структурированный адрес
 result_forward = osm_geocoder({
     "address": "Санкт-Петербург, Невский проспект, 5",
-    "email": "lavrovartem0511@gmail.com",  # ← замените на ваш реальный email!
+    "email": "your.email@example.com",  # ← замените на ваш реальный email!
     "language": "ru"
 })
 
@@ -17,7 +17,7 @@ print("-" * 50)
 result_reverse = osm_geocoder({
     "lat": 59.9366228,
     "lon": 30.3133837,
-    "email": "lavrovartem0511@gmail.com",  # ← тот же email!
+    "email": "your.email@example.com",  # ← тот же email!
     "language": "ru"
 })
 
