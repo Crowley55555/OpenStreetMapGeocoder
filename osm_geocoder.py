@@ -1,7 +1,6 @@
 import time
 import requests
 from urllib.parse import quote_plus
-from functools import lru_cache
 
 # Глобальный последний запрос (для rate limiting)
 _last_request_time = 0
